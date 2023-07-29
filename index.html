@@ -1,0 +1,554 @@
+<html lang="en">
+<head>
+    <title>Korea aging rapidly</title>
+</head>
+<script src='https://d3js.org/d3.v5.min.js'></script>
+<style>
+    body {
+        margin: 10px
+    }
+
+    #tooltip {
+        padding: 5px;
+        background-color: yellow;
+        font-size: 12px;
+        font-family: sans-serif;
+    }
+
+    rect {
+        fill: lightblue;
+        stroke: black;
+    }
+</style>
+<body onload='init()'>
+<h1 style="text-align: center;">
+    Korea aging rapidly
+</h1>
+<h3 style="width: 600px; text-align: center;margin: auto">South Korea is expected to become the country with the largest
+    share of people aged 65 years or older in the world
+    in 2044 due to rapid aging.</h3>
+<p></p>
+<div style="display: flex; justify-content : center; margin-bottom: 5px">
+    <button onclick="selectScene(0)">1</button>
+    <button onclick="selectScene(1)">2</button>
+    <button onclick="selectScene(2)">3</button>
+    <button onclick="selectScene(3)">4</button>
+    <button onclick="selectScene(4)">5</button>
+    <button onclick="selectNextScene()">Next</button>
+</div>
+<div style="display: flex; justify-content : center;">
+    <button id="button_anim" style=" visibility: hidden" onclick="startAnimation()">Animation</button>
+</div>
+<p></p>
+<div id="desc" style="width: 600px; height: 120px; margin: auto"></div>
+<div style="width: 800px; margin: auto; position: relative;">
+    <div id="tooltip" style="opacity: 1; position: absolute; left: 250px; top: 200px;">Click or mouse over a bar on the chart to see the number.</div>
+    <svg width=800 height=500></svg>
+</div>
+<div style="display: flex; justify-content : center;">
+    <label for="rangeElement"></label>
+    <input id="rangeElement" type="range" min="1960" max="2070" value="1960" style="width: 600px;"
+           onchange="changeYear(Number(this.value))"
+           onmousemove="changeYear(Number(this.value))">
+</div>
+<div style="display: flex; justify-content : center;">
+    <div style="width: 600px; ">
+        <span style="text-align: left; float:left">1960</span>
+        <span style="text-align: right; float:right">2070</span>
+    </div>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<div style="display: flex; justify-content : center;">
+    <div style="width: 600px; ">Datasets : <a href= https://kosis.kr/statHtml/statHtml.do?orgId=101&tblId=DT_1BPA001&conn_path=I2&language=en>Statistics Korea, 2021.12.09, 2023.07.26, Projected Population by Age(Korea)</a>(Authoring organization name, Updated Date, Present Date, Statistical Name)</div>
+</div>
+
+<script>
+    const widthIncludeMargin = 800
+    const width = 600
+    const height = 300
+    const margin = 100
+    const barWidth = width / 24
+    const n = 12
+    let data;
+    let dataTotal;
+    let dataAge;
+    let bars;
+    let gx;
+    let gy;
+    let gxLabel;
+    let gyLabel;
+    let yearText;
+    let totalText;
+    let proportion;
+    let axisAnnotation;
+    let selectedYear;
+    let selection = [];
+    let sumSelected = 0;
+    let currentScene = 0;
+
+    async function init() {
+        data = await d3.csv('../KoreanAges.csv');
+        dataTotal = data[0]
+        dataAge = data.slice(1)
+        selectScene(0);
+    }
+
+    function selectNextScene() {
+        selectScene((currentScene + 1) % 5)
+    }
+
+    function startAnimation() {
+        for (let i = 0; i < 6; i++) {
+            document.getElementsByTagName('button')[i].disabled = true
+        }
+        document.getElementById('button_anim').disabled = true
+
+        let year = 1960
+        let interval = d3.interval(() => {
+            changeYear(year)
+            year += 1
+            if (year > 2070) {
+                interval.stop()
+                updateButtonsEnabled(currentScene)
+                document.getElementsByTagName('button')[5].disabled = false
+                document.getElementById('button_anim').disabled = false
+            }
+        }, 100)
+    }
+
+    function updateButtonsEnabled(scene) {
+        for (let i = 0; i < 5; i++) {
+            document.getElementsByTagName('button')[i].disabled = i === scene;
+        }
+        if (scene === 4) {
+            document.getElementsByTagName('button')[5].innerText = "First"
+            document.getElementById('button_anim').style.visibility = "visible"
+        } else {
+            document.getElementsByTagName('button')[5].innerText = "Next"
+            document.getElementById('button_anim').style.visibility = "hidden"
+        }
+    }
+
+    function showBarsAnnotation(svg, scene) {
+        let baseX
+        let baseY
+        let direction
+        let annotation_width
+        let messages
+        switch (scene) {
+            case 0:
+                baseX = margin + width * 0.04
+                baseY = margin + height * 0.02
+                direction = 'right'
+                annotation_width = widthIncludeMargin * 0.025
+                messages = ['', '', 'baby boomers']
+                break
+            case 1:
+                baseX = margin + widthIncludeMargin * 0.605
+                baseY = margin + height * 0.7
+                direction = 'top'
+                annotation_width = widthIncludeMargin * 0.14
+                messages = ['7.22%,', 'exceeding the 7% threshold', 'for an aging society']
+                break
+            case 2:
+                baseX = margin + widthIncludeMargin * 0.605
+                baseY = margin + height * 0.5
+                direction = 'top'
+                annotation_width = widthIncludeMargin * 0.14
+                messages = ['14.28%,', 'exceeding the 14% threshold', 'for an aged society']
+                break
+            case 3:
+                baseX = margin + widthIncludeMargin * 0.605
+                baseY = margin + height * 0.24
+                direction = 'top'
+                annotation_width = widthIncludeMargin * 0.14
+                messages = ['20.57%,', 'exceeding the 20% threshold', 'for a super-aged society']
+                break
+            case 4:
+                baseX = margin + widthIncludeMargin * 0.605
+                baseY = margin + height * 0.19
+                direction = 'top'
+                annotation_width = widthIncludeMargin * 0.14
+                messages = ['37.40%,', 'the largest proportion of elderly population', 'in the world']
+                break
+        }
+
+        let barsAnnotation = svg.append("g")
+            .attr("id", "bars_annotation")
+            .attr("transform", "translate(" + baseX + "," + baseY + ")")
+
+        if (direction === 'top') {
+            barsAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [-annotation_width, 0],
+                    [-annotation_width, -10],
+                    [annotation_width, -10],
+                    [annotation_width, 0]
+                ]))
+
+            barsAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [0, -10],
+                    [0, -20],
+                ]))
+
+            barsAnnotation.append("text")
+                .style("font-weight", "normal")
+                .style("font-size", "14px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .attr("text-anchor", "middle")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("dy", "0.32em")
+                .html('<tspan x="0" y="-80">' + messages[0] + '</tspan>' +
+                    '<tspan x="0" y="-55">' + messages[1] + '</tspan>' +
+                    '<tspan x="0" y="-40">' + messages[2] + '</tspan>')
+        } else if (direction === 'right') {
+            barsAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [-annotation_width, 0],
+                    [-annotation_width, -10],
+                    [+annotation_width, -10],
+                    [+annotation_width, 0]
+                ]))
+
+            barsAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [0, -10],
+                    [0, -20],
+                    [20, -20]
+                ]))
+
+            barsAnnotation.append("text")
+                .style("font-weight", "normal")
+                .style("font-size", "14px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .attr("text-anchor", "start")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("dy", "0.32em")
+                .html('<tspan x="30" y="-60">' + messages[0] + '</tspan>' +
+                    '<tspan x="30" y="-35">' + messages[1] + '</tspan>' +
+                    '<tspan x="30" y="-20">' + messages[2] + '</tspan>')
+        }
+    }
+
+    function selectScene(scene) {
+        currentScene = scene
+
+        if (scene !== 0) {
+            d3.select('#tooltip').style("opacity", 0)
+        }
+
+        updateButtonsEnabled(scene);
+
+        let description
+        switch (scene) {
+            case 0:
+                description = "1955-1963 :  South Korean baby boomers generally refer to those born between 1955 and 1963 after the Korean War. It has resulted in rapid population growth in Korea and now accounts for a large portion of the elderly population."
+                selection = []
+                changeYear(1963, scene)
+                break
+            case 1:
+                description = "2000 : An aging society is a society in which the proportion of the population aged 65 or older is 7% or more. In 2000, Korea entered an aging society with 3,394,896 people aged 65 or older, accounting for 7.22% of the total population."
+                selection = [13, 14, 15, 16, 17, 18, 19, 20]
+                changeYear(2000, scene)
+                break
+            case 2:
+                description = "2017-2018 : An aged society refers to a society in which 14% or more of the population is aged 65 or older. In 2018, Korea entered an aged society with 7,366,085 people aged 65 or older, accounting for 14.28% of the total population. It has been 18 years since Korea entered an aging society. (To be precise, it is said that in November 2017, the proportion of the elderly exceeded 14% and entered an aged society.)"
+                selection = [13, 14, 15, 16, 17, 18, 19, 20]
+                changeYear(2018, scene)
+                break
+            case 3:
+                description = "2025 : A super-aged society is a society in which more than 20% of the population is aged 65 or older. Korea is expected to enter a super-aged society by 2025, exceeding 20% of the elderly. It has been only 7 years since Korea entered an aged society, and the proportion of elderly people is increasing at a very rapid pace compared to other countries."
+                selection = [13, 14, 15, 16, 17, 18, 19, 20]
+                changeYear(2025, scene)
+                break
+            case 4:
+                description = "2044 : The proportion of the elderly aged 65 or older in Korea is expected to reach 36.69%. This exceeds Japan's expected elderly population of 36.5%, making Korea the country with the highest elderly population in the world. Due to such rapid population aging, Korea may experience various political, economic, and social problems. Since population-related problems cannot be resolved in a short period of time, Korea must come up with strong measures for population aging before it is too late."
+
+                selection = [13, 14, 15, 16, 17, 18, 19, 20]
+                changeYear(2044, scene)
+                break
+        }
+        document.getElementById('desc').innerText = description
+    }
+
+    function changeYear(year, barsAnnotation) {
+        if (year === undefined) {
+            selectedYear = 1960
+        } else {
+            if (year !== selectedYear) {
+                clearBarsAnnotation()
+            }
+            selectedYear = year
+        }
+
+        let range = document.getElementById('rangeElement')
+        range.value = selectedYear
+
+        sumSelected = 0
+        d3.selectAll('rect').style("fill", "lightblue")
+
+        selection.forEach(number => {
+                sumSelected += Number(dataAge[number][selectedYear])
+                let node = d3.selectAll('rect').nodes()[number]
+                d3.select(node).style("fill", "orange")
+            }
+        )
+
+        drawPopulationAgeCategory(barsAnnotation)
+    }
+
+    function drawAxisAnnotation(svg) {
+        if (axisAnnotation === undefined) {
+            let baseX = margin + widthIncludeMargin * 0.605
+            let baseY = margin + height * 1.15
+            let annotation_width = widthIncludeMargin * 0.14
+
+            axisAnnotation = svg.append("g")
+                .attr("transform", "translate(" + baseX + "," + baseY + ")")
+
+            axisAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [-annotation_width, -10],
+                    [-annotation_width, 0],
+                    [annotation_width, 0],
+                    [annotation_width, -10]
+                ]))
+
+            axisAnnotation.append("path")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0)
+                .attr("d", d3.line()([
+                    [0, 0],
+                    [0, 10],
+                ]))
+
+            axisAnnotation.append("text")
+                .style("font-weight", "normal")
+                .style("font-size", "14px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .attr("text-anchor", "middle")
+                .attr("x", 0)
+                .attr("y", 20)
+                .attr("dy", "0.32em")
+                .text('Elderly Population')
+        }
+    }
+
+    function clearBarsAnnotation() {
+        d3.select('#bars_annotation').remove()
+    }
+
+    function drawPopulationAgeCategory(barsAnnotation) {
+        let xs = d3.scaleBand().domain([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]).range([0, 600]);
+        let ys = d3.scaleLinear().domain([0, 5000000]).range([300, 0]);
+
+        let svgNode = d3.selectAll('svg').nodes()[0]
+        let svg = d3.select(svgNode);
+
+        updateBars(svg, xs, ys);
+        updateAxis(svg, xs, ys);
+        updateYearText(svg, selectedYear)
+        updateProportion(svg)
+        drawAxisAnnotation(svg)
+
+        if (barsAnnotation !== undefined) {
+            showBarsAnnotation(svg, barsAnnotation)
+        }
+    }
+
+    function updateBars(svg, xs, ys) {
+        if (bars === undefined) {
+            bars = svg.append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .selectAll('rect')
+                .data(dataAge)
+        } else {
+            bars = svg
+                .selectAll('rect')
+                .data(dataAge)
+        }
+
+        bars.enter()
+            .append('rect')
+            .on("mouseover", function (d, i) {
+                d3.select('#tooltip').style("opacity", 1)
+                    .style("left", margin + xs(i) - 1.2 * barWidth + "px")
+                    .style("top", 0.65 * margin + ys(d[selectedYear]) + "px")
+                    .html(d3.format(',d')(d[selectedYear]) + ' (' + d3.format('.2%')(d[selectedYear] / dataTotal[selectedYear]) + ')')
+            })
+            .on("mouseout", function () {
+                d3.select('#tooltip').style("opacity", 0)
+            })
+            .on("click", function (d, i) {
+                if (selection.indexOf(i) === -1) {
+                    if (selectedYear < 2000 && i === 16) {
+                        for (let j = 16; j <= 20; j++) {
+                            selection.push(j);
+                            sumSelected += Number(dataAge[j][selectedYear])
+                            let node = d3.select(this.parentNode).selectAll('rect').nodes()[j]
+                            d3.select(node).style("fill", "orange")
+                        }
+                    } else {
+                        selection.push(i);
+                        sumSelected += Number(d[selectedYear])
+                        d3.select(this).style("fill", "orange");
+                    }
+                } else {
+                    if (selectedYear < 2000 && i === 16) {
+                        for (let j = 20; j >= 16; j--) {
+                            selection.splice(selection.indexOf(i), 1);
+                            sumSelected -= Number(dataAge[j][selectedYear])
+                            let node = d3.select(this.parentNode).selectAll('rect').nodes()[j]
+                            d3.select(node).style("fill", "lightblue")
+                        }
+                    } else {
+                        selection.splice(selection.indexOf(i), 1);
+                        sumSelected -= Number(d[selectedYear])
+                        d3.select(this).style("fill", "lightblue");
+                    }
+                }
+                updateProportion(svg)
+            })
+            .merge(bars)
+            .transition()
+            .attr('x', function (d, i) {
+                return xs(i)
+            })
+            .attr('y', function (d) {
+                return ys(d[selectedYear])
+            })
+            .attr('width', barWidth)
+            .attr('height', function (d) {
+                return 300 - ys(d[selectedYear])
+            })
+        ;
+
+        bars.exit().remove()
+    }
+
+    function updateAxis(svg, xs, ys) {
+        let xTicks19 = ["0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80-", "", "", "", ""]
+        let xTicks20 = ["0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80-84", "85-89", "90-94", "95-99", "100-"]
+
+        let selectedTicks
+        if (selectedYear < 2000) {
+            selectedTicks = xTicks19
+        } else {
+            selectedTicks = xTicks20
+        }
+
+        let xAxis = d3.axisBottom(xs).tickFormat((d, i) => selectedTicks[i]);
+        if (gx === undefined) {
+            gx = svg.append("g")
+                .attr("transform", "translate(" + margin + "," + (margin + height) + ")")
+                .call(xAxis)
+
+            gx.selectAll("text")
+                .attr("transform", "translate(-10,10)" + "rotate(-45)")
+
+        } else {
+            gx.call(xAxis)
+        }
+
+        if (gy === undefined) {
+            gy = svg.append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .call(d3.axisLeft(ys))
+        }
+
+        if (gxLabel === undefined) {
+            gxLabel = svg.append("text")
+                .attr("x", width + 1.4 * margin)
+                .attr("y", height + margin)
+                .style("font-size", "12px")
+                .style("font-family", "sans-serif")
+                .style("text-anchor", "middle")
+                .text("Age")
+        }
+
+        if (gyLabel === undefined) {
+            gyLabel = svg.append("text")
+                .attr("x", margin)
+                .attr("y", 0.8 * margin)
+                .style("font-size", "12px")
+                .style("font-family", "sans-serif")
+                .style("text-anchor", "middle")
+                .text("Population")
+        }
+    }
+
+    function updateYearText(svg) {
+        if (yearText === undefined) {
+            yearText = svg.append("text")
+                .style("font-weight", "bold")
+                .style("font-size", "30px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .attr("text-anchor", "end")
+                .attr("x", width + margin)
+                .attr("y", margin / 2)
+                .attr("dy", "0.32em")
+        }
+        yearText.text(selectedYear);
+
+    }
+
+    function updateProportion(svg) {
+        if (totalText === undefined) {
+            totalText = svg.append("text")
+                .style("font-weight", "bold")
+                .style("font-size", "14px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .attr("text-anchor", "start")
+                .attr("x", margin)
+                .attr("y", height + margin * 1.55)
+                .attr("dy", "0.32em")
+        }
+        totalText.text('Total: ' + d3.format(',d')(dataTotal[selectedYear]));
+
+        if (proportion === undefined) {
+            proportion = svg.append("text")
+                .style("font-weight", "bold")
+                .style("font-size", "14px")
+                .style("font-family", "sans-serif")
+                .style("font-variant-numeric", "tabular-nums")
+                .style('fill', 'orange')
+                .attr("text-anchor", "start")
+                .attr("x", margin)
+                .attr("y", height + margin * 1.75)
+                .attr("dy", "0.32em")
+        }
+        if (sumSelected === 0) {
+            proportion.text('');
+        } else {
+            proportion.text('Selection: ' + d3.format(',d')(sumSelected) +
+                ' (' + d3.format('.2%')(sumSelected / dataTotal[selectedYear]) + ')');
+        }
+    }
+</script>
+</body>
+</html>
